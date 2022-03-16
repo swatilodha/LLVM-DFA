@@ -5,9 +5,11 @@ CXXFLAGS = -rdynamic $(shell llvm-config --cxxflags) $(INC) -g -O0 -fPIC
 
 dataflow.o: dataflow.cpp dataflow.h
 
-available-support.o: available-support.cpp available-support.h	
+available-support.o: available-support.cpp available-support.h
 
-%.so: %.o dataflow.o available-support.o
+reaching-support.o: reaching-support.cpp reaching-support.h
+
+%.so: %.o dataflow.o available-support.o reaching-support.o
 	$(CXX) -dylib -shared $^ -o $@
 
 clean:

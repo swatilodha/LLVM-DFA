@@ -1,5 +1,5 @@
 // ECE/CS 5544 S22 Assignment 2: available.cpp
-// Group:
+// Group: Swati Lodha, Abhijit Tripathy
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -48,9 +48,9 @@ namespace {
         BitVector boundaryCond(expressions.size(), false);
         BitVector initCond(expressions.size(), true);
         dataFlow* df = new dataFlow(expressions.size(),INTERSECTION,FORWARD,boundaryCond,initCond);
-        generateDeps(F,expressions);
+        initializeDeps(F,expressions);
         df->executeDataFlowPass(F,bbSets);
-        printDFAResults(df->dataFlowHash);
+        printResults(df->dataFlowHash);
         // Did not modify the incoming Function.
         return false;
     }
@@ -63,7 +63,7 @@ namespace {
     std::map<BasicBlock*,basicBlockDeps*> bbSets;
     std::map<Expression,int> domainMap;
     std::map<int,string> revDomainMap;
-    void generateDeps(Function &F, std::vector<Expression> domain)
+    void initializeDeps(Function &F, std::vector<Expression> domain)
     {
       BitVector empty((int)domain.size(), false);
       int vectorIdx = 0;
@@ -87,7 +87,7 @@ namespace {
           {
             outs() << "Value name : " << I->getName() << "\n";
             lhs = I->getName();
-            if(std::find(domain.begin(),domain.end(),Expression(I)) != domain.end())
+            if(std::find(domain.begin(), domain.end(), Expression(I)) != domain.end())
             {
               bbSet->genSet.set(domainMap[Expression(I)]); 
             }
@@ -107,7 +107,7 @@ namespace {
       }
     }
 
-    void printDFAResults(std::map<BasicBlock*,basicBlockProps*> dFAHash)
+    void printResults(std::map<BasicBlock*,basicBlockProps*> dFAHash)
     {
       std::map<BasicBlock*,basicBlockProps*>::iterator it = dFAHash.begin();
       while(it != dFAHash.end())
