@@ -85,7 +85,6 @@ namespace {
           Instruction *I = &II;
           if(dyn_cast<BinaryOperator>(I))
           {
-            outs() << "Value name : " << I->getName() << "\n";
             lhs = I->getName();
             if(std::find(domain.begin(), domain.end(), Expression(I)) != domain.end())
             {
