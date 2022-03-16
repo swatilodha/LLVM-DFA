@@ -11,6 +11,8 @@
 #include "dataflow.h"
 #include "reaching-support.h"
 
+#include <unordered_set>
+
 using namespace llvm;
 using namespace std;
 
@@ -68,8 +70,11 @@ namespace {
       BitVector empty((int)domain.size(), false);
       int vectorIdx = 0;
       StringRef lhs;
+      unordered_set<string> domainLhsSet;
+      unordered_set<string> bbLhsSet;
       for(Definition d : domain) {
         domainMap[d] = vectorIdx;
+        domainLhsSet.insert(getShortValueName1(d.lhs));
         revDomainMap[vectorIdx] = d.toString();
         ++vectorIdx;
       }
@@ -86,14 +91,6 @@ namespace {
             if(std::find(domain.begin(), domain.end(), Definition(BO1)) != domain.end()) {
               bbSet->genSet.set(domainMap[Definition(BO1)]); 
             }
-            // Calculate kill[BB] : Set of definitions in the domain that are killed by the current Basic Block
-            for(Definition itr: domain) {
-              string s_lhs = getShortValueName1(itr.lhs);
-              if(lhs == s_lhs) {
-                bbSet->killSet.set(domainMap[itr]);
-                // bbSet->genSet.reset(domainMap[itr]);
-              }
-            }
             for(BasicBlock::iterator prev = BB.begin(); prev != II; ++prev) {
                 Instruction* prevInst = &(*prev);
                 if(BinaryOperator* BO_prev = dyn_cast<BinaryOperator>(prevInst)){
@@ -102,6 +99,11 @@ namespace {
                         bbSet->genSet.reset(domainMap[Definition(prevInst)]);
                     }
                 }
+            }
+            // Calculate kill[BB] : Set of definitions in the domain that are killed by the current Basic Block
+            string s_lhs = getShortValueName1(itr.lhs);
+            if(domainLhsSet.find(s_lhs) != domainLhsSet.end()) {
+              bbSet->killSet.set(domainMap[itr]);
             }
           }
         }
