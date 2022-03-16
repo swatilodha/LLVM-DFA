@@ -6,6 +6,16 @@ The project consists of the following:
 - Available Expressions Pass [code](available.cpp)
 - Liveness Analysis Pass [code](liveness.cpp)
 
+---
+## Build Shared Objects
+
+Build the project using :
+```
+make clean
+make
+```
+---
+## Run Passes
 The command to run the passes is :
 ```
 ./run.sh <pass-name>
