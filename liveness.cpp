@@ -56,19 +56,24 @@ public:
     outs() << "Variables used by this function:\n";
     printStringSet(&variables);
 
+    // Generate reverse post-order traversal for Liveness Analysis.
     po_iterator<BasicBlock *> start = po_begin(&F.getEntryBlock());
     po_iterator<BasicBlock *> end = po_end(&F.getEntryBlock());
+    
+
     while (start != end) {
-      backorder.push_back(*start);
+      rpo.push_back(*start);
       ++start;
     }
 
     BitVector boundaryCond(variables.size(), false);
     BitVector initCond(variables.size(), false);
+
     dataFlow *df =
         new dataFlow(variables.size(), UNION, BACKWARD, boundaryCond, initCond);
-    genTFDependencies(F, variables);
-    df->executeDataFlowPass(F, bbSets);
+    initializeGenAndKillSet(F, variables);
+    df->executeDataFlowPass(F, bbMap
+);
     // df->printMapping();
     printDFAResults(df->dataFlowHash);
     // Did not modify the incoming Function.
@@ -80,23 +85,25 @@ public:
   }
 
 private:
-  std::vector<BasicBlock *> backorder;
-  std::map<BasicBlock *, basicBlockDeps *> bbSets;
-  std::map<string, int> domainMap;
-  std::map<int, string> revDomainMap;
+  std::vector<BasicBlock *> rpo;        // rpo traversal vector
+  std::map<BasicBlock *, basicBlockDeps *> bbMap;     // BasicBlock - GenSet, KillSet mapping
+  std::map<string, int> domainMap;        // map of Variables in the domain to their position in the bit-vector
+  std::map<int, string> revDomainMap;     // reverse map of bit-vector indices to variables
   BitVector phiValues;
-  void genTFDependencies(Function &F, std::vector<string> domain) {
+  void initializeGenAndKillSet(Function &F, std::vector<string> domain) {
     BitVector empty((int)domain.size(), false);
     phiValues = empty;
     int vectorIdx = 0;
+    // Populate domain and reverse-domain maps
     for (string v : domain) {
       domainMap[v] = vectorIdx;
       revDomainMap[vectorIdx] = v;
       ++vectorIdx;
     }
-    for (BasicBlock *BB : backorder) {
+    for (BasicBlock *BB : rpo) {
       struct basicBlockDeps *bbSet = new basicBlockDeps();
       bbSet->blockRef = BB;
+      // Initialize genset and killset
       bbSet->genSet = empty;
       bbSet->killSet = empty;
       for (BasicBlock::reverse_iterator II = BB->rbegin(); II != BB->rend();
@@ -126,7 +133,7 @@ private:
           }
         }
       }
-      bbSets[BB] = bbSet;
+      bbMap[BB] = bbSet;
     }
     phiValues.flip();
   }

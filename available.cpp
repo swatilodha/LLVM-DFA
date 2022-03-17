@@ -51,7 +51,7 @@ public:
     dataFlow *df = new dataFlow(expressions.size(), INTERSECTION, FORWARD,
                                 boundaryCond, initCond);
     initializeDeps(F, expressions);
-    df->executeDataFlowPass(F, bbSets);
+    df->executeDataFlowPass(F, bbMap);
     printResults(df->dataFlowHash);
     // Did not modify the incoming Function.
     return false;
@@ -62,7 +62,7 @@ public:
   }
 
 private:
-  std::map<BasicBlock *, basicBlockDeps *> bbSets;
+  std::map<BasicBlock *, basicBlockDeps *> bbMap;
   std::map<Expression, int> domainMap;
   std::map<int, string> revDomainMap;
   void initializeDeps(Function &F, std::vector<Expression> domain) {
@@ -97,7 +97,7 @@ private:
           }
         }
       }
-      bbSets[&BB] = bbSet;
+      bbMap[&BB] = bbSet;
     }
   }
 
