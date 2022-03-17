@@ -83,7 +83,6 @@ private:
       for (BasicBlock::iterator II = BB.begin(); II != BB.end(); ++II) {
         Instruction *I = &(*II);
         if (BinaryOperator *BO1 = dyn_cast<BinaryOperator>(I)) {
-          outs() << "Value name : " << I->getName() << "\n";
           string lhs = getShortValueName1(I);
           if (std::find(domain.begin(), domain.end(), Definition(BO1)) !=
               domain.end()) {
