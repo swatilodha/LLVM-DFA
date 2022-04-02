@@ -24,9 +24,9 @@ using namespace std;
 
 namespace llvm {
 
-enum pass_direction { FORWARD = 0, BACKWARD = 0 };
+enum pass_direction { FORWARD = 0, BACKWARD = 1 };
 
-enum meet { UNION = 0, INTERSECTION = 0 };
+enum meet { UNION = 0, INTERSECTION = 1 };
 
 enum block_type {
   ENTRY = 0,
