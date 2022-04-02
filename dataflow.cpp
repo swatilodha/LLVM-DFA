@@ -97,11 +97,11 @@ void Dataflow::run(Function &F) {
       // Apply meet function based on
       if (dir == FORWARD) {
         for (BasicBlock *p : dfa[BB]->p_blocks) {
-          meet_inputs.push_back(dfa[*p]->bb_output);
+          meet_inputs.push_back(dfa[p]->bb_output);
         }
       } else if (dir == BACKWARD) {
         for (BasicBlock *s : dfa[BB]->s_blocks) {
-          meet_inputs.push_back(dfa[sb]->bb_input);
+          meet_inputs.push_back(dfa[s]->bb_input);
         }
       }
       if (!meet_inputs.empty()) {

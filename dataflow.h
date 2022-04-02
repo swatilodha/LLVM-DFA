@@ -53,38 +53,41 @@ struct bb_props {
 };
 
 class Dataflow {
-private:
-  int domain_size;
-  enum pass_direction dir;
-  map<BasicBlock *, struct bb_req *> bb_map;
-  BitVector (*meet_func)(vector<BitVector>);
-  void (*transfer_func)(struct bb_props *);
-  BitVector init_cond;
-  BitVector boundary_cond;
-  vector<BasicBlock *> po_traversal;
-  vector<BasicBlock *> rpo_traversal;
-  void init_props(Function &F);
-  void init_prev_and_next(BasicBlock *BB, struct bb_props *props);
-  void gen_traversal(Function &F);
+  private:
+    int domain_size;
+    enum pass_direction dir;
+    map<BasicBlock *, struct bb_req *> bb_map;
+    BitVector (*meet_fn)(vector<BitVector>);
+    void (*transfer_fn)(struct bb_props *);
+    BitVector init_cond;
+    BitVector boundary_cond;
+    vector<BasicBlock *> po_traversal;
+    vector<BasicBlock *> rpo_traversal;
+    void init_props(Function &F);
+    void init_prev_and_next(BasicBlock *BB, struct bb_props *props);
+    void gen_traversal(Function &F);
 
-public:
-  map<BasicBlock *, bb_props *> dfa; // Dataflow Analysis result map
-  Dataflow(int domain_size, enum pass_direction dir,
-           BitVector (*meet_func)(vector<BitVector>),
-           void (*transfer_func)(struct bb_props *),
-           map<BasicBlock *, struct bb_req *> bb_map, BitVector init_cond,
-           BitVector boundary_cond) { // Initialize the DFA
+  public:
+    map<BasicBlock *, bb_props *> dfa; // Dataflow Analysis result map
+    
+    Dataflow(int domain_size, 
+            enum pass_direction dir,
+            BitVector (*meet_fn)(vector<BitVector>),
+            void (*transfer_fn)(struct bb_props *),
+            map<BasicBlock *, struct bb_req *> bb_map, 
+            BitVector init_cond,
+            BitVector boundary_cond) { // Initialize the DFA
 
-    this->domain_size = domain_size;
-    this->dir = dir;
-    this->meet_fn = meet_fn;
-    this->transfer_fn = transfer_fn;
-    this->bb_map = bb_map;
-    this->init_cond = init_cond;
-    this->boundary_cond = boundary_cond;
-  }
-  void run(Function &F);
-};
+      this->domain_size = domain_size;
+      this->dir = dir;
+      this->meet_fn = meet_fn;
+      this->transfer_fn = transfer_fn;
+      this->bb_map = bb_map;
+      this->init_cond = init_cond;
+      this->boundary_cond = boundary_cond;
+    }
+    void run(Function &F);
+  };
 } // namespace llvm
 
 #endif

@@ -14,17 +14,32 @@
 using namespace llvm;
 using namespace std;
 
-namespace {
+namespace llvm {
+
+void transfer_fn(struct bb_props *props) {
+  BitVector kill_set = props->kill_set;
+  props->bb_output = kill_set.flip();
+  props->bb_output &= props->bb_input;
+  props->bb_output |= props->gen_set;
+}
+
+BitVector meet_fn(vector<BitVector> input) {
+  int _sz = input.size();
+
+  BitVector result = input[0];
+  for(int i=1;i<_sz;i++) {
+    result &= input[i];
+  }
+
+  return result;
+}
+
 class AvailableExpressions : public FunctionPass {
 public:
   static char ID;
   AvailableExpressions() : FunctionPass(ID) {}
 
   virtual bool runOnFunction(Function &F) {
-
-    // Here's some code to familarize you with the Expression
-    // class and pretty printing code we've provided:
-
     vector<Expression> expressions;
     for (Function::iterator FI = F.begin(), FE = F.end(); FI != FE; ++FI) {
       BasicBlock *block = &*FI;
@@ -42,18 +57,26 @@ public:
       }
     }
 
-    // Print out the expressions used in the function
     outs() << "Expressions used by this function:\n";
     printSet(&expressions);
 
-    BitVector boundaryCond(expressions.size(), false);
-    BitVector initCond(expressions.size(), true);
-    dataFlow *df = new dataFlow(expressions.size(), INTERSECTION, FORWARD,
-                                boundaryCond, initCond);
-    initializeDeps(F, expressions);
-    df->executeDataFlowPass(F, bbMap);
-    printResults(df->dataFlowHash);
-    // Did not modify the incoming Function.
+    BitVector boundary_cond(expressions.size(), false);
+    BitVector init_cond(expressions.size(), true);
+
+    init_map(F, expressions);
+
+    Dataflow *df = new Dataflow(
+      expressions.size(), 
+      BACKWARD, 
+      meet_fn, 
+      transfer_fn, 
+      bb_map, 
+      init_cond, 
+      boundary_cond
+    );
+
+    df->run(F);
+    printResults(df->dfa);
     return false;
   }
 
@@ -62,80 +85,87 @@ public:
   }
 
 private:
-  std::map<BasicBlock *, basicBlockDeps *> bbMap;
-  std::map<Expression, int> domainMap;
-  std::map<int, string> revDomainMap;
-  void initializeDeps(Function &F, std::vector<Expression> domain) {
-    BitVector empty((int)domain.size(), false);
-    int vectorIdx = 0;
+  map<BasicBlock *, struct bb_req *> bb_map;
+  map<Expression, int> domain_map;
+  map<int, string> rev_domain_map;
+
+
+  void init_map(Function &F, vector<Expression> domain) {
+    BitVector empty(domain.size(), false);
+    int idx = 0;
     StringRef lhs;
-    for (Expression e : domain) {
-      domainMap[e] = vectorIdx;
-      revDomainMap[vectorIdx] = e.toString();
-      ++vectorIdx;
+
+    for(Expression e : domain) {
+      domain_map[e] = idx;
+      rev_domain_map[idx] = e.toString();
+      ++idx;
     }
-    for (BasicBlock &BB : F) {
-      struct basicBlockDeps *bbSet = new basicBlockDeps();
-      bbSet->blockRef = &BB;
-      bbSet->genSet = empty;
-      bbSet->killSet = empty;
-      for (Instruction &II : BB) {
+
+    for(BasicBlock &BB: F) {
+      struct bb_req *info = new bb_req();
+      info->block_ref = &BB;
+      info->gen_set = empty;
+      info->kill_set = empty;
+
+      for(Instruction &II : BB) {
         Instruction *I = &II;
-        if (dyn_cast<BinaryOperator>(I)) {
+        if(dyn_cast<BinaryOperator>(I)) {
+          Expression exp = Expression(I);
           lhs = I->getName();
-          if (std::find(domain.begin(), domain.end(), Expression(I)) !=
-              domain.end()) {
-            bbSet->genSet.set(domainMap[Expression(I)]);
+          if(find(domain.begin(), domain.end(), exp) != domain.end()) {
+            info->gen_set.set(domain_map[exp]);
           }
-          for (Expression itr : domain) {
-            StringRef exprOp1 = itr.v1->getName();
-            StringRef exprOp2 = itr.v2->getName();
-            if (exprOp1.equals(lhs) || exprOp2.equals(lhs)) {
-              bbSet->killSet.set(domainMap[itr]);
-              bbSet->genSet.reset(domainMap[itr]);
+
+          for(Expression e : domain) {
+            StringRef e_op1 = e.v1->getName();
+            StringRef e_op2 = e.v2->getName();
+
+            if(e_op1.equals(lhs) || e_op2.equals(lhs)) {
+              info->kill_set.set(domain_map[e]);
+              info->gen_set.reset(domain_map[e]);
             }
           }
         }
       }
-      bbMap[&BB] = bbSet;
+      bb_map[&BB] = info;
     }
   }
 
-  void printResults(std::map<BasicBlock *, basicBlockProps *> dFAHash) {
-    std::map<BasicBlock *, basicBlockProps *>::iterator it = dFAHash.begin();
-    while (it != dFAHash.end()) {
-      struct basicBlockProps *temp = dFAHash[it->first];
+  void printResults(map<BasicBlock *, struct bb_props *> dfa) {
+    std::map<BasicBlock *, struct bb_props *>::iterator it = dfa.begin();
+    while (it != dfa.end()) {
+      struct bb_props *temp = dfa[it->first];
       outs() << "Basic Block Name : ";
-      outs() << temp->block->getName() << "\n";
+      outs() << temp->block_ref->getName() << "\n";
       std::vector<string> genbb;
       outs() << "gen[BB] : ";
-      for (int m = 0; m < (int)temp->genSet.size(); m++) {
-        if (temp->genSet[m]) {
-          genbb.push_back(revDomainMap[m]);
+      for (int m = 0; m < (int)temp->gen_set.size(); m++) {
+        if (temp->gen_set[m]) {
+          genbb.push_back(rev_domain_map[m]);
         }
       }
       printStringSet(&genbb);
       std::vector<string> killbb;
       outs() << "kill[BB] : ";
-      for (int n = 0; n < (int)temp->killSet.size(); n++) {
-        if (temp->killSet[n]) {
-          killbb.push_back(revDomainMap[n]);
+      for (int n = 0; n < (int)temp->kill_set.size(); n++) {
+        if (temp->kill_set[n]) {
+          killbb.push_back(rev_domain_map[n]);
         }
       }
       printStringSet(&killbb);
       std::vector<string> inbb;
       outs() << "IN[BB] : ";
-      for (int k = 0; k < (int)temp->bbInput.size(); k++) {
-        if (temp->bbInput[k]) {
-          inbb.push_back(revDomainMap[k]);
+      for (int k = 0; k < (int)temp->bb_input.size(); k++) {
+        if (temp->bb_input[k]) {
+          inbb.push_back(rev_domain_map[k]);
         }
       }
       printStringSet(&inbb);
       std::vector<string> outbb;
       outs() << "OUT[BB] : ";
-      for (int l = 0; l < (int)temp->bbOutput.size(); l++) {
-        if (temp->bbOutput[l]) {
-          outbb.push_back(revDomainMap[l]);
+      for (int l = 0; l < (int)temp->bb_output.size(); l++) {
+        if (temp->bb_output[l]) {
+          outbb.push_back(rev_domain_map[l]);
         }
       }
       printStringSet(&outbb);
@@ -148,4 +178,4 @@ private:
 char AvailableExpressions::ID = 0;
 RegisterPass<AvailableExpressions> X("available",
                                      "ECE/CS 5544 Available Expressions");
-} // namespace
+}
