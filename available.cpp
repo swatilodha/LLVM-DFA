@@ -24,9 +24,12 @@ void transfer_fn(struct bb_props *props) {
 }
 
 BitVector meet_fn(vector<BitVector> input) {
-  int _sz = input.size();
+  size_t _sz = input.size();
 
   BitVector result = input[0];
+
+  // Meet Function : Intersection
+  // result stores bitwise AND of all input BitVectors
   for(int i=1;i<_sz;i++) {
     result &= input[i];
   }
@@ -48,7 +51,7 @@ public:
         Instruction *I = &*i;
         // We only care about available expressions for BinaryOperators
         if (BinaryOperator *BI = dyn_cast<BinaryOperator>(I)) {
-          if (std::find(expressions.begin(), expressions.end(),
+          if (find(expressions.begin(), expressions.end(),
                         Expression(BI)) != expressions.end())
             continue;
           else
@@ -132,12 +135,12 @@ private:
   }
 
   void printResults(map<BasicBlock *, struct bb_props *> dfa) {
-    std::map<BasicBlock *, struct bb_props *>::iterator it = dfa.begin();
+    map<BasicBlock *, struct bb_props *>::iterator it = dfa.begin();
     while (it != dfa.end()) {
       struct bb_props *temp = dfa[it->first];
       outs() << "Basic Block Name : ";
       outs() << temp->block_ref->getName() << "\n";
-      std::vector<string> genbb;
+      vector<string> genbb;
       outs() << "gen[BB] : ";
       for (int m = 0; m < (int)temp->gen_set.size(); m++) {
         if (temp->gen_set[m]) {
@@ -145,7 +148,7 @@ private:
         }
       }
       printStringSet(&genbb);
-      std::vector<string> killbb;
+      vector<string> killbb;
       outs() << "kill[BB] : ";
       for (int n = 0; n < (int)temp->kill_set.size(); n++) {
         if (temp->kill_set[n]) {
@@ -153,7 +156,7 @@ private:
         }
       }
       printStringSet(&killbb);
-      std::vector<string> inbb;
+      vector<string> inbb;
       outs() << "IN[BB] : ";
       for (int k = 0; k < (int)temp->bb_input.size(); k++) {
         if (temp->bb_input[k]) {
@@ -161,7 +164,7 @@ private:
         }
       }
       printStringSet(&inbb);
-      std::vector<string> outbb;
+      vector<string> outbb;
       outs() << "OUT[BB] : ";
       for (int l = 0; l < (int)temp->bb_output.size(); l++) {
         if (temp->bb_output[l]) {
