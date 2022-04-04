@@ -1,6 +1,6 @@
 INC=-I/usr/local/include/
 # all: liveness.so available.so reaching.so
-all: available.so
+all: available.so dominators.so
 
 CXXFLAGS = -rdynamic $(shell llvm-config --cxxflags) $(INC) -g -O0 -fPIC
 

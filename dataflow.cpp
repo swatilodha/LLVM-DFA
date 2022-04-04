@@ -4,126 +4,129 @@ using namespace std;
 
 namespace llvm {
 
-void Dataflow::gen_traversal(Function &F) {
-  stack<BasicBlock *> rpo_stack;
-  po_iterator<BasicBlock *> start = po_begin(&F.getEntryBlock());
-  po_iterator<BasicBlock *> end = po_end(&F.getEntryBlock());
-  while (start != end) {
-    po_traversal.push_back(*start);
-    rpo_stack.push(*start);
-    ++start;
-  }
-
-  while (!rpo_stack.empty()) {
-    rpo_traversal.push_back(rpo_stack.top());
-    rpo_stack.pop();
-  }
-}
-
-void Dataflow::init_prev_and_next(BasicBlock *BB, struct bb_props *props) {
-  for (BasicBlock *pred_blocks : predecessors(BB)) {
-    props->p_blocks.push_back(pred_blocks);
-  }
-  for (BasicBlock *succ_blocks : successors(BB)) {
-    props->s_blocks.push_back(succ_blocks);
-  }
-}
-
-void Dataflow::init_props(Function &F) {
-  BitVector empty(domain_size, false);
-
-  for (BasicBlock &BB : F) {
-    struct bb_props *props = new bb_props();
-    props->block_ref = &BB;
-    props->bb_input = empty;
-    props->bb_output = empty;
-
-    // Set GenSet and KillSet
-    struct bb_req *req = bb_map[&BB];
-    props->gen_set = req->gen_set;
-    props->kill_set = req->kill_set;
-
-    // Initialize predecessors and successors for each BasicBlock
-    init_prev_and_next(&BB, props);
-
-    // Determine block type - <ENTRY, EXIT, REGULAR>
-    if (&BB == &F.getEntryBlock()) {
-      props->b_t = ENTRY;
-    } else {
-      props->b_t = REGULAR;
+  void Dataflow::populateTraversal(Function &F) {
+    stack<BasicBlock *> rpo_stack;
+    po_iterator<BasicBlock *> start = po_begin(&F.getEntryBlock());
+    po_iterator<BasicBlock *> end = po_end(&F.getEntryBlock());
+    while (start != end) {
+      poTraversal.push_back(*start);
+      rpo_stack.push(*start);
+      ++start;
     }
-    for (Instruction &II : BB) {
-      Instruction *I = &II;
-      if (isa<ReturnInst>(I)) {
-        props->b_t = EXIT;
-      }
+
+    while (!rpo_stack.empty()) {
+      rpoTraversal.push_back(rpo_stack.top());
+      rpo_stack.pop();
     }
-    dfa[&BB] = props;
   }
 
-  map<BasicBlock *, struct bb_props *>::iterator it = dfa.begin();
-  struct bb_props *temp;
-
-  // Set initial and boundary conditions for each BasicBlock
-  while (it != dfa.end()) {
-    temp = dfa[it->first];
-    if (dir == FORWARD) {
-      if (temp->b_t == ENTRY) {
-        temp->bb_input = boundary_cond;
-      }
-      temp->bb_output = init_cond;
-    } else if (dir == BACKWARD) {
-      if (temp->b_t == EXIT) {
-        temp->bb_output = boundary_cond;
-      }
-      temp->bb_input = init_cond;
+  void Dataflow::populateEdges(BasicBlock *BB, struct bbProps *props) {
+    for (BasicBlock *pred_blocks : predecessors(BB)) {
+      props->pBlocks.push_back(pred_blocks);
     }
-    ++it;
+    for (BasicBlock *succ_blocks : successors(BB)) {
+      props->sBlocks.push_back(succ_blocks);
+    }
   }
-}
 
-void Dataflow::run(Function &F) {
-  bool converged = false;
-  map<BasicBlock *, BitVector> prev_output;
-  init_props(F);
-  gen_traversal(F);
-  int iter = 0;
-  vector<BasicBlock *> traversal =
-      (dir == FORWARD) ? po_traversal : rpo_traversal;
-  while (!converged) {
-    for (BasicBlock *BB : traversal) {
-      prev_output[BB] = dfa[BB]->bb_output;
-      vector<BitVector> meet_inputs;
-      // Apply meet function based on
-      if (dir == FORWARD) {
-        for (BasicBlock *p : dfa[BB]->p_blocks) {
-          meet_inputs.push_back(dfa[p]->bb_output);
-        }
-      } else if (dir == BACKWARD) {
-        for (BasicBlock *s : dfa[BB]->s_blocks) {
-          meet_inputs.push_back(dfa[s]->bb_input);
+  void Dataflow::initializeBlocks(struct bbProps *block) {
+    if(dir == FORWARD) {
+      if(block->type == ENTRY)
+        block->bbInput = boundaryCond;
+      block->bbOutput = initCond;
+    } else if(dir == BACKWARD) {
+      if(block->type == EXIT)
+        block->bbOutput = boundaryCond;
+      block->bbInput = initCond;
+    }
+  }
+
+  void Dataflow::initializeDfa(Function &F, map<BasicBlock *, struct bbInfo *> infoMap) {
+    BitVector empty(domainSize, false);
+
+    for (BasicBlock &BB : F) {
+      struct bbProps *props = new bbProps();
+      props->ref = &BB;
+      props->bbInput = empty;
+      props->bbOutput = empty;
+
+      // Set GenSet and KillSet
+      struct bbInfo *info = infoMap[&BB];
+      props->genSet = info->genSet;
+      props->killSet = info->killSet;
+
+      // Initialize predecessors and successors for each BasicBlock
+      populateEdges(&BB, props);
+
+      // Determine block type - <ENTRY, EXIT, REGULAR>
+      if (&BB == &F.getEntryBlock()) {
+        props->type = ENTRY;
+      } else {
+        props->type = REGULAR;
+      }
+      for (Instruction &II : BB) {
+        Instruction *I = &II;
+        if (isa<ReturnInst>(I)) {
+          props->type = EXIT;
         }
       }
-      if (!meet_inputs.empty()) {
-        BitVector meet = meet_fn(meet_inputs);
+      result[&BB] = props;
+    }
+
+    map<BasicBlock *, struct bbProps *>::iterator it = result.begin();
+    struct bbProps *blk;
+
+    // Set initial and boundary conditions for each BasicBlock
+    while (it != result.end()) {
+      blk = result[it->first];
+      initializeBlocks(blk);
+      ++it;
+    }
+  }
+
+
+  void Dataflow::run(Function &F, map<BasicBlock *, struct bbInfo *> infoMap) {
+    bool converged = false;
+    map<BasicBlock *, BitVector> prevOutput;
+    initializeDfa(F, infoMap);
+    populateTraversal(F);
+    int iter = 0;
+    vector<BasicBlock *> traversal =
+        (dir == FORWARD) ? poTraversal : rpoTraversal;
+    while (!converged) {
+      for (BasicBlock *BB : traversal) {
+        prevOutput[BB] = result[BB]->bbOutput;
+        vector<BitVector> meetInputs;
+        // Apply meet function based on
         if (dir == FORWARD) {
-          dfa[BB]->bb_input = meet;
+          for (BasicBlock *p : result[BB]->pBlocks) {
+            meetInputs.push_back(result[p]->bbOutput);
+          }
         } else if (dir == BACKWARD) {
-          dfa[BB]->bb_output = meet;
+          for (BasicBlock *s : result[BB]->sBlocks) {
+            meetInputs.push_back(result[s]->bbInput);
+          }
+        }
+        if (!meetInputs.empty()) {
+          BitVector meet = meetFn(meetInputs);
+          if (dir == FORWARD) {
+            result[BB]->bbInput = meet;
+          } else if (dir == BACKWARD) {
+            result[BB]->bbOutput = meet;
+          }
+        }
+        transferFn(result[BB]);
+      }
+      converged = true;
+      for (map<BasicBlock *, BitVector>::iterator it = prevOutput.begin();
+          it != prevOutput.end(); ++it) {
+        if ((result[it->first]->bbOutput) != it->second) {
+          converged = false;
+          break;
         }
       }
-      transfer_fn(dfa[BB]);
+      ++iter;
     }
-    converged = true;
-    for (map<BasicBlock *, BitVector>::iterator it = prev_output.begin();
-         it != prev_output.end(); ++it) {
-      if ((dfa[it->first]->bb_output) != it->second) {
-        converged = false;
-        break;
-      }
-    }
-    ++iter;
+    outs() << "DFA converged after " << iter << " iterations\n";
   }
-  outs() << "DFA converged after " << iter << "\n";
 }
-} // namespace llvm

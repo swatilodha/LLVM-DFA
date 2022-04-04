@@ -24,70 +24,65 @@ using namespace std;
 
 namespace llvm {
 
-enum pass_direction { FORWARD = 0, BACKWARD = 0 };
 
-enum meet { UNION = 0, INTERSECTION = 0 };
+  enum passDirection {
+    FORWARD = 0,
+    BACKWARD = 0,
+  };
 
-enum block_type {
-  ENTRY = 0,
-  EXIT = 1,
-  REGULAR = 2,
-};
+  enum bbType {
+    ENTRY = 0,
+    EXIT = 1,
+    REGULAR = 2,
+  };
 
-struct bb_req { // struct for each BasicBlock's gen and kill sets that are
-                // required as inputs for dataflow analysis
-  BasicBlock *block_ref;
-  BitVector gen_set;
-  BitVector kill_set;
-};
+  struct bbInfo {
+    BasicBlock *ref;
+    BitVector genSet;
+    BitVector killSet;
+  };
 
-struct bb_props {
-  enum block_type b_t;
-  BasicBlock *block_ref;
-  BitVector bb_input;
-  BitVector bb_output;
-  BitVector gen_set;             // Gen Set for each block
-  BitVector kill_set;            // Kill set for each block
-  vector<BasicBlock *> p_blocks; // Predecessor Blocks
-  vector<BasicBlock *> s_blocks; // Successor Blocks
-};
+  struct bbProps {
+    enum bbType type;
+    BasicBlock *ref;
+    BitVector bbInput;
+    BitVector bbOutput;
+    BitVector genSet;             // Gen Set for each block
+    BitVector killSet;            // Kill set for each block
+    vector<BasicBlock *> pBlocks; // Predecessor Blocks
+    vector<BasicBlock *> sBlocks; // Successor Blocks   
+  };
 
-class Dataflow {
+
+  class Dataflow {
   private:
-    int domain_size;
-    enum pass_direction dir;
-    map<BasicBlock *, struct bb_req *> bb_map;
-    BitVector (*meet_fn)(vector<BitVector>);
-    void (*transfer_fn)(struct bb_props *);
-    BitVector init_cond;
-    BitVector boundary_cond;
-    vector<BasicBlock *> po_traversal;
-    vector<BasicBlock *> rpo_traversal;
-    void init_props(Function &F);
-    void init_prev_and_next(BasicBlock *BB, struct bb_props *props);
-    void gen_traversal(Function &F);
+    int domainSize;
+    enum passDirection dir;
+
+    vector<BasicBlock *> poTraversal;
+    vector<BasicBlock *> rpoTraversal;
+
+    void populateEdges(BasicBlock *BB, struct bbProps *props);
+    void initializeDfa(Function &F, map<BasicBlock *, struct bbInfo *> infoMap);
+    void initializeBlocks(struct bbProps *block);
+    virtual void populateTraversal(Function &F);
 
   public:
-    map<BasicBlock *, bb_props *> dfa; // Dataflow Analysis result map
-    
-    Dataflow(int domain_size, 
-            enum pass_direction dir,
-            BitVector (*meet_fn)(vector<BitVector>),
-            void (*transfer_fn)(struct bb_props *),
-            map<BasicBlock *, struct bb_req *> bb_map, 
-            BitVector init_cond,
-            BitVector boundary_cond) { // Initialize the DFA
+    map<BasicBlock *, struct bbProps *> result;
+    BitVector initCond;
+    BitVector boundaryCond;
 
-      this->domain_size = domain_size;
+    Dataflow(int domainSize, enum passDirection dir, BitVector boundaryCond, BitVector initCond) {
+      this->domainSize = domainSize;
       this->dir = dir;
-      this->meet_fn = meet_fn;
-      this->transfer_fn = transfer_fn;
-      this->bb_map = bb_map;
-      this->init_cond = init_cond;
-      this->boundary_cond = boundary_cond;
+      this->boundaryCond = boundaryCond;
+      this->initCond = initCond;
     }
-    void run(Function &F);
+    virtual BitVector meetFn(vector<BitVector> input) = 0;
+    virtual void transferFn(struct bbProps *block) = 0;
+
+    void run(Function &F, map<BasicBlock *, struct bbInfo *> infoMap);
   };
-} // namespace llvm
+}
 
 #endif
