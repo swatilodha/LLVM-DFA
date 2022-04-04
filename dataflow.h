@@ -24,10 +24,9 @@ using namespace std;
 
 namespace llvm {
 
-
   enum passDirection {
     FORWARD = 0,
-    BACKWARD = 0,
+    BACKWARD = 1,
   };
 
   enum bbType {
@@ -55,6 +54,7 @@ namespace llvm {
 
 
   class Dataflow {
+
   private:
     int domainSize;
     enum passDirection dir;
