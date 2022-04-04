@@ -134,5 +134,5 @@ private:
 };
 
 char Dominators::ID = 0;
-RegisterPass<Dominators> X("dominators", "ECE/CS 5544 Available Expressions");
+RegisterPass<Dominators> X("dominators", "ECE/CS 5544 Dominators Pass");
 } // namespace llvm
